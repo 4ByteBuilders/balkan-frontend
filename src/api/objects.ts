@@ -9,6 +9,12 @@ export const getRootLevelObjects = async () => {
         resources(folderId: $folderId) {
           id
           name
+          owner {
+            id
+            username
+          }
+          createdAt
+          updatedAt
           ... on File {
             sizeBytes
             mimeType
@@ -47,6 +53,7 @@ export const getRootLevelObjects = async () => {
       }
     `;
     const response = await gqlRequest(query, { folderId: null });
+    console.log(response.data.resources);
     return response.data.resources;
   } catch (err) {
     console.log(err);
@@ -210,4 +217,19 @@ export const uploadFileAPI = async ({
   console.log("uploafing");
   const res = await uploadGqlRequest(query, { file, parentId });
   console.log(res);
+};
+
+export const deleteObjectAPI = async (id: string) => {
+  const query = `
+    mutation DeleteObject($id: ID!) {
+      deleteObject(id: $id)
+    }
+  `;
+  const response = await gqlRequest(query, { id });
+
+  if (!response.data) {
+    throw new CustomError("Failed to delete object", 500);
+  }
+
+  return response.data;
 };

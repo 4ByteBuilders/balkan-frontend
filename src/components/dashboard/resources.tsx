@@ -7,7 +7,6 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import CustomError from "@/lib/CustomError";
 import type { Object, ObjectPath } from "@/lib/interfaces";
-import { useEffect, useState } from "react";
 import { ErrorPage } from "../common/error";
 import { ActionButtons } from "./action_buttons";
 import { LoadingPage } from "../common/loading";
@@ -16,6 +15,8 @@ import toast from "react-hot-toast";
 import { AxiosError } from "axios";
 import { ResourcesList } from "./ResourcesList";
 import { ArrowLeft } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 interface ResourcesProps {
   ids: ObjectPath[];
@@ -24,82 +25,116 @@ interface ResourcesProps {
 
 export const Resources = ({ ids, setIds }: ResourcesProps) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [objects, setObjects] = useState<Object[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  // Current folder key (root = "root")
+  const currentFolderId = ids.length === 0 ? "root" : ids[ids.length - 1].id;
 
-  const handleFolderClick = async (id: ObjectPath) => {
-    setIds((prev) => [...prev, id]);
-  };
-
-  const fetchObjects = async () => {
-    setLoading(true);
-    try {
-      if (ids.length === 0) {
-        const data = await getRootLevelObjects();
-        setObjects(data);
-      } else {
-        const data = await getObjectsByParentId(ids[ids.length - 1].id);
-        setObjects(data);
+  // Fetch objects for current folder
+  const {
+    data: objects = [],
+    error,
+    isLoading,
+    refetch,
+  } = useQuery<Object[], Error>({
+    queryKey: ["resources", currentFolderId],
+    queryFn: async () => {
+      if (currentFolderId === "root") {
+        return await getRootLevelObjects();
       }
-    } catch (err) {
-      setError((err as CustomError).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return await getObjectsByParentId(currentFolderId);
+    },
+    enabled: !!user, // only run if user exists
+    staleTime: 1000 * 60 * 5, // cache for 5 mins
+  });
 
-  const createFolder = async (name: string) => {
-    try {
-      await createNewFolder({
+  // Mutation: Create Folder
+  const createFolderMutation = useMutation({
+    mutationFn: (name: string) =>
+      createNewFolder({
         name,
-        parentId: ids.length === 0 ? undefined : ids[ids.length - 1].id,
-      });
+        parentId: currentFolderId === "root" ? undefined : currentFolderId,
+      }),
+    onSuccess: () => {
       toast.success("Successfully created folder in current directory");
-      await fetchObjects();
-    } catch (err) {
-      if (err instanceof CustomError) {
-        toast.error(err.message);
-      } else if (err instanceof AxiosError) {
-        toast.error(err.message);
-      } else {
-        toast.error("Some unusual error occured. Please try again later.");
-      }
-    }
-  };
-
-  const uploadFile = async (file: File) => {
-    try {
-      await uploadFileAPI({
-        file,
-        parentId: ids.length === 0 ? undefined : ids[ids.length - 1].id,
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
       });
-      toast.success("Successfully uploaded file.");
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       if (err instanceof CustomError) {
         toast.error(err.message);
       } else if (err instanceof AxiosError) {
         toast.error(err.message);
       } else {
-        toast.error("Some unusual error occured. Try again later.");
+        toast.error("Some unusual error occurred. Please try again later.");
       }
-    }
+    },
+  });
+
+  // Mutation: Upload File
+  const uploadFileMutation = useMutation({
+    mutationFn: (file: File) =>
+      uploadFileAPI({
+        file,
+        parentId: currentFolderId === "root" ? undefined : currentFolderId,
+      }),
+    onSuccess: () => {
+      toast.success("Successfully uploaded file.");
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof CustomError) {
+        toast.error(err.message);
+      } else if (err instanceof AxiosError) {
+        toast.error(err.message);
+      } else {
+        toast.error("Some unusual error occurred. Try again later.");
+      }
+    },
+  });
+
+  // TODO: Implement deleteResourceAPI in @/api/objects.ts
+  const deleteResourceMutation = useMutation({
+    mutationFn: (id: string) => {
+      console.log("Deleting resource with id:", id);
+      // return deleteResourceAPI(id);
+      return Promise.resolve();
+    },
+    onSuccess: () => {
+      toast.success("Successfully deleted resource.");
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+      setSelectedId(null); // Deselect after deletion
+    },
+    onError: (err: unknown) => {
+      if (err instanceof CustomError) {
+        toast.error(err.message);
+      } else if (err instanceof AxiosError) {
+        toast.error(err.message);
+      } else {
+        toast.error("Some unusual error occurred. Try again later.");
+      }
+    },
+  });
+
+  const handleFolderClick = (id: ObjectPath) => {
+    setIds((prev) => [...prev, id]);
+    setSelectedId(null);
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchObjects();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, ids]);
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingPage />;
   }
 
   if (error) {
-    return <ErrorPage error={new Error(error)} onRetry={fetchObjects} />;
+    return (
+      <ErrorPage error={new Error(error.message)} onRetry={() => refetch()} />
+    );
   }
 
   return (
@@ -113,11 +148,16 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
       <div className="flex items-center justify-between bg-gray-100 p-2 rounded-lg">
         {/* Back Button */}
         <button
-          onClick={() => setIds((prev) => prev.slice(0, -1))}
+          onClick={() => {
+            setIds((prev) => prev.slice(0, -1));
+            setSelectedId(null);
+          }}
           disabled={ids.length === 0}
-          className={`px-3 py-1 rounded-lg text-sm font-medium transition
-            ids.length === 0 ? "text-gray-50" : ""
-          `}
+          className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
+            ids.length === 0
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-500 text-white hover:bg-blue-600"
+          }`}
         >
           <ArrowLeft />
         </button>
@@ -125,21 +165,25 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
         {/* Path */}
         <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
           <span
-            onClick={() => setIds([])}
+            onClick={() => {
+              setIds([]);
+              setSelectedId(null);
+            }}
             className="cursor-pointer font-semibold hover:underline"
           >
             root
           </span>
-          {ids.map((folderId, index) => (
-            <span key={folderId.id} className="flex items-center gap-1">
+          {ids.map((folder, index) => (
+            <span key={folder.id} className="flex items-center gap-1">
               <span className="text-gray-400">/</span>
               <span
-                onClick={() =>
-                  setIds(ids.slice(0, index + 1) as unknown as ObjectPath[])
-                }
+                onClick={() => {
+                  setIds(ids.slice(0, index + 1) as ObjectPath[]);
+                  setSelectedId(null);
+                }}
                 className="cursor-pointer hover:underline"
               >
-                {folderId.name}
+                {folder.name}
               </span>
             </span>
           ))}
@@ -147,7 +191,30 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
       </div>
 
       {/* Action buttons (upload, create folder) */}
-      <ActionButtons createFolder={createFolder} uploadFile={uploadFile} />
+      <ActionButtons
+        createFolder={(name) =>
+          new Promise<void>((resolve, reject) => {
+            createFolderMutation.mutate(name, {
+              onSuccess: () => resolve(),
+              onError: (error) => reject(error),
+            });
+          })
+        }
+        uploadFile={(file) =>
+          new Promise<void>((resolve, reject) => {
+            uploadFileMutation.mutate(file, {
+              onSuccess: () => resolve(),
+              onError: (error) => reject(error),
+            });
+          })
+        }
+        selectedId={selectedId}
+        handleDelete={() => {
+          if (selectedId) {
+            deleteResourceMutation.mutate(selectedId);
+          }
+        }}
+      />
 
       {/* Resources list */}
       <div className="h-full space-y-2">
@@ -157,6 +224,8 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
           <ResourcesList
             resourceArray={objects}
             handleFolderClick={handleFolderClick}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
           />
         )}
       </div>

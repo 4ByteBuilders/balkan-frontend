@@ -7,11 +7,15 @@ import { UploadFileModal } from "../resources/UploadFolder";
 interface ActionButtonsProps {
   createFolder: (name: string) => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
+  selectedId: string | null;
+  handleDelete: () => void;
 }
 
 export const ActionButtons = ({
   createFolder,
   uploadFile,
+  selectedId,
+  handleDelete,
 }: ActionButtonsProps) => {
   const [openCreateFolderModal, setOpenCreateFolderModal] =
     useState<boolean>(false);
@@ -33,7 +37,7 @@ export const ActionButtons = ({
         <BadgePlus />
         New Folder
       </Button>
-      <Button variant="outline">
+      <Button variant="outline" onClick={handleDelete} disabled={!selectedId}>
         <Delete />
         Delete
       </Button>

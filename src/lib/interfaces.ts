@@ -4,11 +4,17 @@ export interface User {
   username: string;
 }
 
+interface Owner {
+  id: string;
+  username: string;
+}
+
 export interface Object {
   id: string;
   name: string;
   type: string;
-  owner: string;
+  mimeType?: string;
+  owner: Owner;
   updatedAt: string;
   createdAt: string;
   parentId?: string;
