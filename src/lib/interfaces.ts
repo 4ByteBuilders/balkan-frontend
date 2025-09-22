@@ -3,3 +3,18 @@ export interface User {
   email: string;
   username: string;
 }
+
+export interface Object {
+  id: string;
+  name: string;
+  type: string;
+  owner: string;
+  updatedAt: string;
+  createdAt: string;
+  parentId?: string;
+}
+
+export interface ObjectPath {
+  id: string;
+  name: string;
+}

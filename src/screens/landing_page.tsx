@@ -1,3 +1,4 @@
+import { Dashboard } from "@/components/dashboard/dashboard";
 import { Hero } from "@/components/landing/hero";
 import { useAuth } from "@/context/AuthContext";
 
@@ -7,13 +8,7 @@ export const LandingPage = () => {
   return (
     <div className="min-h-[calc(100vh-64px)]">
       {/* first component */}
-      {isAuthenticated ? (
-        <div className="text-center mt-20 text-2xl font-semibold">
-          You are logged in!
-        </div>
-      ) : (
-        <Hero />
-      )}
+      {isAuthenticated ? <Dashboard /> : <Hero />}
     </div>
   );
 };
