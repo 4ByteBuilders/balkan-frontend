@@ -1,8 +1,13 @@
 import {
   createNewFolder,
+  deleteResourceAPI,
+  moveResourceAPI,
   getObjectsByParentId,
   getRootLevelObjects,
   uploadFileAPI,
+  renameResourceAPI,
+  searchResourcesAPI,
+  type SearchFilters,
 } from "@/api/objects";
 import { useAuth } from "@/context/AuthContext";
 import CustomError from "@/lib/CustomError";
@@ -17,6 +22,9 @@ import { ResourcesList } from "./ResourcesList";
 import { ArrowLeft } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { MoveResourceModal } from "../resources/MoveResourceModal";
+import { RenameResourceModal } from "../resources/RenameResourceModal";
+import { SearchBar } from "./SearchBar";
 
 interface ResourcesProps {
   ids: ObjectPath[];
@@ -27,11 +35,14 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  // Current folder key (root = "root")
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(
+    null
+  );
+  const isSearching = searchFilters !== null;
   const currentFolderId = ids.length === 0 ? "root" : ids[ids.length - 1].id;
 
-  // Fetch objects for current folder
   const {
     data: objects = [],
     error,
@@ -45,8 +56,18 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
       }
       return await getObjectsByParentId(currentFolderId);
     },
-    enabled: !!user, // only run if user exists
-    staleTime: 1000 * 60 * 5, // cache for 5 mins
+    enabled: !!user && !isSearching,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: searchResults = [],
+    isLoading: isSearchingLoading,
+    error: searchError,
+  } = useQuery<Object[], Error>({
+    queryKey: ["search-resources", searchFilters],
+    queryFn: () => searchResourcesAPI({ filters: searchFilters! }),
+    enabled: isSearching,
   });
 
   // Mutation: Create Folder
@@ -97,12 +118,13 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
     },
   });
 
-  // TODO: Implement deleteResourceAPI in @/api/objects.ts
   const deleteResourceMutation = useMutation({
     mutationFn: (id: string) => {
-      console.log("Deleting resource with id:", id);
-      // return deleteResourceAPI(id);
-      return Promise.resolve();
+      const fileType = objects.find((obj) => obj.id === id)?.type;
+      return deleteResourceAPI({
+        id,
+        type: fileType === "folder" ? "folder" : "file",
+      });
     },
     onSuccess: () => {
       toast.success("Successfully deleted resource.");
@@ -122,18 +144,134 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
     },
   });
 
-  const handleFolderClick = (id: ObjectPath) => {
-    setIds((prev) => [...prev, id]);
+  // Mutation: Move Resource
+  const moveResourceMutation = useMutation({
+    mutationFn: ({
+      resourceId,
+      parentId,
+    }: {
+      resourceId: string;
+      parentId: string | undefined;
+    }) => {
+      const resourceToMove = objects.find((obj) => obj.id === resourceId);
+      if (!resourceToMove) {
+        // This should ideally not happen if an item is selected
+        return Promise.reject(
+          new Error("Could not find the selected resource to move.")
+        );
+      }
+      return moveResourceAPI({
+        object_id: resourceId,
+        parent_id: parentId,
+        type: resourceToMove.type === "folder" ? "folder" : "file",
+      });
+    },
+    onSuccess: (_, variables) => {
+      toast.success("Resource moved successfully.");
+      // Invalidate the cache for the source folder (where the item was moved from)
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+      // Invalidate the cache for the destination folder (where the item was moved to)
+      queryClient.invalidateQueries({
+        queryKey: ["resources", variables.parentId || "root"],
+      });
+      setSelectedId(null);
+      setIsMoveModalOpen(false);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof CustomError) {
+        toast.error(err.message);
+      } else if (err instanceof AxiosError) {
+        toast.error(err.message);
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error("Some unusual error occurred. Please try again later.");
+      }
+    },
+  });
+
+  // Mutation: Rename Resource
+  const renameResourceMutation = useMutation({
+    mutationFn: ({
+      resourceId,
+      newName,
+    }: {
+      resourceId: string;
+      newName: string;
+    }) => {
+      const resourceToRename =
+        displayData.find((obj) => obj.id === resourceId) || null;
+      if (!resourceToRename) {
+        return Promise.reject(
+          new Error("Could not find the selected resource to rename.")
+        );
+      }
+      return renameResourceAPI({
+        id: resourceId,
+        newName,
+        type: resourceToRename.type === "folder" ? "folder" : "file",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Resource renamed successfully.");
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["search-resources"] });
+      setIsRenameModalOpen(false);
+      setSelectedId(null);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof CustomError || err instanceof AxiosError) {
+        toast.error(err.message);
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error("An error occurred while renaming the resource.");
+      }
+    },
+  });
+
+  const handleFolderClick = (clickedObject: ObjectPath) => {
+    if (isSearching) {
+      // When a folder is clicked from search results, exit search mode
+      // and navigate to that folder from the root.
+      // NOTE: This doesn't preserve the folder's full path as the search API
+      // doesn't return it. The user will see the folder as if it's at the root.
+      setSearchFilters(null);
+      setIds([clickedObject]);
+    } else {
+      setIds((prev) => [...prev, clickedObject]);
+    }
     setSelectedId(null);
   };
 
-  if (isLoading) {
+  const handleSearch = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+    setSelectedId(null);
+  };
+
+  const clearSearch = () => {
+    setSearchFilters(null);
+    setSelectedId(null);
+  };
+
+  const displayLoading = isLoading || isSearchingLoading;
+  const displayError = error || searchError;
+  const displayData = isSearching ? searchResults : objects;
+
+  if (displayLoading) {
     return <LoadingPage />;
   }
 
-  if (error) {
+  if (displayError) {
     return (
-      <ErrorPage error={new Error(error.message)} onRetry={() => refetch()} />
+      <ErrorPage
+        error={new Error(displayError.message)}
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -146,89 +284,151 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
     >
       {/* Top bar with path + back button */}
       <div className="flex items-center justify-between bg-gray-100 p-2 rounded-lg">
-        {/* Back Button */}
-        <button
-          onClick={() => {
-            setIds((prev) => prev.slice(0, -1));
-            setSelectedId(null);
-          }}
-          disabled={ids.length === 0}
-          className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
-            ids.length === 0
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 text-white hover:bg-blue-600"
-          }`}
-        >
-          <ArrowLeft />
-        </button>
+        {isSearching ? (
+          <div className="font-semibold text-gray-700">
+            Search Results{" "}
+            {searchFilters?.name && `for "${searchFilters.name}"`}
+          </div>
+        ) : (
+          <>
+            {/* Back Button */}
+            <button
+              onClick={() => {
+                setIds((prev) => prev.slice(0, -1));
+                setSelectedId(null);
+              }}
+              disabled={ids.length === 0}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
+                ids.length === 0
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              <ArrowLeft />
+            </button>
 
-        {/* Path */}
-        <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
-          <span
-            onClick={() => {
-              setIds([]);
-              setSelectedId(null);
-            }}
-            className="cursor-pointer font-semibold hover:underline"
-          >
-            root
-          </span>
-          {ids.map((folder, index) => (
-            <span key={folder.id} className="flex items-center gap-1">
-              <span className="text-gray-400">/</span>
+            {/* Path */}
+            <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
               <span
                 onClick={() => {
-                  setIds(ids.slice(0, index + 1) as ObjectPath[]);
+                  setIds([]);
                   setSelectedId(null);
                 }}
                 className="cursor-pointer hover:underline"
               >
-                {folder.name}
+                root
               </span>
-            </span>
-          ))}
-        </div>
+              {ids.map((folder, index) => (
+                <span key={folder.id} className="flex items-center gap-1">
+                  <span className="text-gray-400">/</span>
+                  <span
+                    onClick={() => {
+                      setIds(ids.slice(0, index + 1) as ObjectPath[]);
+                      setSelectedId(null);
+                    }}
+                    className="cursor-pointer hover:underline"
+                  >
+                    {folder.name}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Action buttons (upload, create folder) */}
-      <ActionButtons
-        createFolder={(name) =>
-          new Promise<void>((resolve, reject) => {
-            createFolderMutation.mutate(name, {
-              onSuccess: () => resolve(),
-              onError: (error) => reject(error),
-            });
-          })
-        }
-        uploadFile={(file) =>
-          new Promise<void>((resolve, reject) => {
-            uploadFileMutation.mutate(file, {
-              onSuccess: () => resolve(),
-              onError: (error) => reject(error),
-            });
-          })
-        }
-        selectedId={selectedId}
-        handleDelete={() => {
-          if (selectedId) {
-            deleteResourceMutation.mutate(selectedId);
+      {/* Action buttons and Search Bar */}
+      <div className="flex justify-between items-center gap-4">
+        <ActionButtons
+          createFolder={(name) =>
+            new Promise<void>((resolve, reject) => {
+              createFolderMutation.mutate(name, {
+                onSuccess: () => resolve(),
+                onError: (error) => reject(error),
+              });
+            })
           }
-        }}
-      />
+          uploadFile={(file) =>
+            new Promise<void>((resolve, reject) => {
+              uploadFileMutation.mutate(file, {
+                onSuccess: () => resolve(),
+                onError: (error) => reject(error),
+              });
+            })
+          }
+          onRenameClick={() => setIsRenameModalOpen(true)}
+          onMoveClick={() => setIsMoveModalOpen(true)}
+          isDeleting={deleteResourceMutation.isPending}
+          selectedId={selectedId}
+          handleDelete={() => {
+            if (selectedId) {
+              deleteResourceMutation.mutate(selectedId);
+            }
+          }}
+        />
+        <SearchBar
+          onSearch={handleSearch}
+          isSearching={isSearching}
+          clearSearch={clearSearch}
+        />
+      </div>
 
       {/* Resources list */}
       <div className="h-full space-y-2">
-        {objects.length === 0 ? (
-          <p>No resources found. Start by uploading or creating new ones!</p>
+        {displayData.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">
+            {isSearching
+              ? "No results found for your search."
+              : "This folder is empty."}
+          </p>
         ) : (
           <ResourcesList
-            resourceArray={objects}
+            resourceArray={displayData}
             handleFolderClick={handleFolderClick}
             selectedId={selectedId}
             onSelect={setSelectedId}
           />
         )}
       </div>
+
+      {isMoveModalOpen && (
+        <MoveResourceModal
+          isOpen={isMoveModalOpen}
+          onClose={() => setIsMoveModalOpen(false)}
+          resourceToMove={
+            displayData.find((obj) => obj.id === selectedId) || null
+          }
+          isMoving={moveResourceMutation.isPending}
+          sourceParentId={currentFolderId}
+          onMove={(destinationId) => {
+            if (selectedId) {
+              moveResourceMutation.mutate({
+                resourceId: selectedId,
+                parentId: destinationId,
+              });
+            }
+          }}
+        />
+      )}
+
+      {isRenameModalOpen && (
+        <RenameResourceModal
+          isOpen={isRenameModalOpen}
+          onClose={() => setIsRenameModalOpen(false)}
+          currentName={
+            displayData.find((obj) => obj.id === selectedId)?.name || ""
+          }
+          isRenaming={renameResourceMutation.isPending}
+          onRename={(newName) => {
+            if (selectedId) {
+              renameResourceMutation.mutate({
+                resourceId: selectedId,
+                newName,
+              });
+            }
+          }}
+        />
+      )}
     </motion.div>
   );
 };

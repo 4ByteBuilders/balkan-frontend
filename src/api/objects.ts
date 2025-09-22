@@ -219,12 +219,26 @@ export const uploadFileAPI = async ({
   console.log(res);
 };
 
-export const deleteObjectAPI = async (id: string) => {
-  const query = `
-    mutation DeleteObject($id: ID!) {
-      deleteObject(id: $id)
-    }
-  `;
+export const deleteResourceAPI = async ({
+  id,
+  type,
+}: {
+  id: string;
+  type: string;
+}) => {
+  let query;
+  if (type === "folder") {
+    query = `
+    mutation DeleteFolder($id: ID!) {
+      deleteFolder(id: $id)
+  }`;
+  } else {
+    query = `
+    mutation DeleteFile($id: ID!) {
+      deleteFile(id: $id)
+  }`;
+  }
+
   const response = await gqlRequest(query, { id });
 
   if (!response.data) {
@@ -232,4 +246,187 @@ export const deleteObjectAPI = async (id: string) => {
   }
 
   return response.data;
+};
+
+export const moveResourceAPI = async ({
+  object_id,
+  parent_id,
+  type,
+}: {
+  object_id: string;
+  parent_id?: string;
+  type: "file" | "folder";
+}) => {
+  try {
+    const isFolder = type === "folder";
+    const query = isFolder
+      ? `
+      mutation MoveFolder($folderId: ID!, $newParentId: ID) {
+        moveFolder(folderId: $folderId, newParentId: $newParentId) {
+          id
+          name
+          parent {
+            id
+            name
+          }
+        }
+      }
+    `
+      : `
+      mutation MoveFile($fileId: ID!, $newParentId: ID) {
+        moveFile(fileId: $fileId, newParentId: $newParentId) {
+          id
+          name
+          parent {
+            id
+            name
+          }
+        }
+      }
+    `;
+
+    const variables = isFolder
+      ? { folderId: object_id, newParentId: parent_id }
+      : { fileId: object_id, newParentId: parent_id };
+
+    const response = await gqlRequest(query, variables);
+
+    if (!response.data) {
+      throw new CustomError("Failed to move object", 500);
+    }
+
+    return isFolder ? response.data.moveFolder : response.data.moveFile;
+  } catch (err) {
+    console.log(err);
+    if (err instanceof AxiosError) {
+      throw new CustomError(
+        err.response?.data.errors[0].message || "Failed to move object",
+        err.response?.status || 500
+      );
+    }
+    throw new CustomError("Failed to move object", 500);
+  }
+};
+
+export interface SearchFilters {
+  name?: string;
+  types?: ("file" | "folder")[];
+  mimeTypes?: string[];
+  minSizeBytes?: number;
+  maxSizeBytes?: number;
+  afterDate?: string; // ISO 8601 format
+  tags?: string[];
+  uploaderName?: string;
+}
+
+export const searchResourcesAPI = async ({
+  filters,
+  offset,
+  limit,
+}: {
+  filters: SearchFilters;
+  offset?: number;
+  limit?: number;
+}) => {
+  try {
+    const query = `
+      query SearchResources($filters: SearchFilters!, $offset: Int, $limit: Int) {
+        searchResources(filters: $filters, offset: $offset, limit: $limit) {
+          id
+          name
+          ... on File {
+            type
+            sizeBytes
+            mimeType
+          }
+          ... on Folder {
+            type
+            children {
+              id
+              name
+            }
+          }
+          tags {
+            id
+            name
+          }
+          owner {
+            id
+            username
+          }
+          createdAt
+          updatedAt
+        }
+      }
+    `;
+
+    const response = await gqlRequest(query, { filters, offset, limit });
+
+    if (!response.data) {
+      throw new CustomError("Failed to search resources", 500);
+    }
+
+    return response.data.searchResources;
+  } catch (err) {
+    console.log(err);
+    if (err instanceof AxiosError) {
+      throw new CustomError(
+        err.response?.data.errors[0].message || "Failed to search resources",
+        err.response?.status || 500
+      );
+    }
+    throw new CustomError("Failed to search resources", 500);
+  }
+};
+
+export const renameResourceAPI = async ({
+  id,
+  newName,
+  type,
+}: {
+  id: string;
+  newName: string;
+  type: "file" | "folder";
+}) => {
+  try {
+    const isFolder = type === "folder";
+    const query = isFolder
+      ? `
+      mutation RenameFolder($id: ID!, $newName: String!) {
+        renameFolder(id: $id, newName: $newName) {
+          id
+          name
+          type
+        }
+      }
+    `
+      : `
+      mutation RenameFile($id: ID!, $newName: String!) {
+        renameFile(id: $id, newName: $newName) {
+          id
+          name
+          type
+        }
+      }
+    `;
+
+    const variables = { id, newName };
+
+    const response = await gqlRequest(query, variables);
+
+    if (!response.data) {
+      throw new CustomError("Failed to rename resource", 500);
+    }
+
+    return isFolder ? response.data.renameFolder : response.data.renameFile;
+  } catch (err) {
+    console.log(err);
+    if (err instanceof AxiosError) {
+      throw new CustomError(
+        err.response?.data.errors[0].message || "Failed to rename resource",
+        err.response?.status || 500
+      );
+    }
+    throw new CustomError("Failed to rename resource", 500);
+  }
 };
