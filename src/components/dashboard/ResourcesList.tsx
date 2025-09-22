@@ -15,11 +15,9 @@ const formatDate = (dateString: string) => {
     return "Invalid Date";
   }
 
-  const parsableDate = dateString
-    .substring(0, dateString.lastIndexOf(" "))
-    .replace(" ", "T");
+  const parsableDate = dateString.substring(0, dateString.lastIndexOf(" "));
 
-  return dayjs(parsableDate).format("YYYY-MM-DD");
+  return dayjs(parsableDate).format("YYYY-MM-DD HH:mm");
 };
 
 export const ResourcesList = ({

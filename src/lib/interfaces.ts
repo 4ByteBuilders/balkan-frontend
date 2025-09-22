@@ -7,6 +7,14 @@ export interface User {
 interface Owner {
   id: string;
   username: string;
+  email?: string;
+}
+
+export type Role = "VIEWER" | "EDITOR";
+
+export interface Permission {
+  user: User;
+  role: Role;
 }
 
 export interface Object {
@@ -17,7 +25,10 @@ export interface Object {
   owner: Owner;
   updatedAt: string;
   createdAt: string;
+  sizeBytes?: number;
+  shareToken: string;
   parentId?: string;
+  permissions?: Permission[];
 }
 
 export interface ObjectPath {

@@ -4,7 +4,7 @@ import { Redo2 } from "lucide-react";
 
 interface ErrorPageProps {
   error: Error;
-  onRetry: () => void;
+  onRetry?: () => void;
 }
 
 export const ErrorPage = ({ error, onRetry }: ErrorPageProps) => {
@@ -16,10 +16,20 @@ export const ErrorPage = ({ error, onRetry }: ErrorPageProps) => {
       className="h-full flex md:text-xl text-center p-4 items-center justify-center flex-col"
     >
       <div className="text-red-600 mb-4">Error: {error.message}</div>
-      <Button variant={"outline"} onClick={onRetry}>
-        <Redo2 className="mr-2" />
-        Retry
-      </Button>
+      {onRetry ? (
+        <Button variant={"outline"} onClick={onRetry}>
+          <Redo2 className="mr-2" />
+          Retry
+        </Button>
+      ) : (
+        <Button
+          variant={"outline"}
+          onClick={() => (window.location.href = "/")}
+        >
+          <Redo2 className="mr-2" />
+          <span>Go to Home</span>
+        </Button>
+      )}
     </motion.div>
   );
 };

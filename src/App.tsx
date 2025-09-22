@@ -5,6 +5,7 @@ import ProfilePage from "./components/profile/profile";
 import { Footer } from "./components/common/footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
+import { SharedResourcePage } from "./lib/SharedResourcePage";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/file/:shareToken" element={<SharedResourcePage />} />
             <Route path="*" element={<div>Not Found</div>} />
             <Route path="/profile" element={<ProfilePage />} />
           </Routes>
