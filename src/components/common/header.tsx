@@ -64,11 +64,11 @@ export const Header = ({ children }: { children: React.ReactNode }) => {
             transition={{ delay: 0.2 }}
             className="hidden md:flex items-center relative w-72 lg:w-96"
           >
-            <Search className="absolute left-3 h-4 w-4 text-gray-400" />
+            {/* <Search className="absolute left-3 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search..."
               className="pl-10 rounded-full border-gray-200 bg-gray-50 focus-visible:ring-1 focus-visible:ring-gray-300"
-            />
+            /> */}
           </motion.div>
         )}
 
@@ -91,11 +91,12 @@ export const Header = ({ children }: { children: React.ReactNode }) => {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Button variant="ghost" className="">
-                    <User className="text-lg" />
-                    Profile
-                  </Button>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onSelect={() => (window.location.href = "/profile")}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Button variant="ghost" className="">

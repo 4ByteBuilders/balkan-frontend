@@ -73,6 +73,7 @@ export const getRootLevelObjects = async () => {
 export const getObjectsByParentId = async (folderId: string) => {
   try {
     const response = await gqlRequest(RESOURCES_QUERY_FRAGMENT, { folderId });
+    console.log("RESPONSE", response.data);
     return response.data.resources;
   } catch (err) {
     console.log(err);
@@ -417,6 +418,24 @@ export const resolveShareLinkAPI = async (token: string) => {
           }
           ... on Folder {
             type
+            children {
+              id
+              name
+              owner {
+                id
+                username
+              }
+              createdAt
+              updatedAt
+              ... on File {
+                type
+                sizeBytes
+                mimeType
+              }
+              ... on Folder {
+                type
+              }
+            }
           }
         }
       }
