@@ -233,3 +233,30 @@ export const deleteObjectAPI = async (id: string) => {
 
   return response.data;
 };
+
+export const getMe = async () => {
+  try {
+    const query = `
+      query GetMe {
+        me {
+          id
+          username
+          email
+          Role
+          StorageUsed
+          DeduplicationStorageUsed
+        }
+      }
+    `;
+    const response = await gqlRequest(query);
+    return response.data;
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      throw new CustomError(
+        err.response?.data.errors[0].message || "Failed to fetch user profile",
+        err.response?.status || 500
+      );
+    }
+    throw new CustomError("Failed to fetch user profile", 500);
+  }
+};
