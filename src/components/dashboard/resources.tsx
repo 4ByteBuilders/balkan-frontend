@@ -7,6 +7,7 @@ import {
   uploadFileAPI,
   renameResourceAPI,
   searchResourcesAPI,
+  grantPermissionAPI,
   type SearchFilters,
 } from "@/api/objects";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MoveResourceModal } from "../resources/MoveResourceModal";
 import { RenameResourceModal } from "../resources/RenameResourceModal";
+import { ShareResourceModal } from "../resources/ShareResourceModal";
 import { SearchBar } from "./SearchBar";
 
 interface ResourcesProps {
@@ -37,6 +39,7 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(
     null
   );
@@ -234,6 +237,36 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
     },
   });
 
+  // Mutation: Grant Permission
+  const grantPermissionMutation = useMutation({
+    mutationFn: ({
+      resourceId,
+      email,
+      role,
+    }: {
+      resourceId: string;
+      email: string;
+      role: "VIEWER" | "EDITOR";
+    }) => grantPermissionAPI({ resourceId, email, role }),
+    onSuccess: () => {
+      toast.success("Permission granted successfully.");
+      // Invalidate queries to refetch resource data with new permissions
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["search-resources"] });
+    },
+    onError: (err: unknown) => {
+      if (err instanceof CustomError || err instanceof AxiosError) {
+        toast.error(err.message);
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error("An error occurred while granting permission.");
+      }
+    },
+  });
+
   const handleFolderClick = (clickedObject: ObjectPath) => {
     if (isSearching) {
       // When a folder is clicked from search results, exit search mode
@@ -356,6 +389,7 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
               });
             })
           }
+          onShareClick={() => setIsShareModalOpen(true)}
           onRenameClick={() => setIsRenameModalOpen(true)}
           onMoveClick={() => setIsMoveModalOpen(true)}
           isDeleting={deleteResourceMutation.isPending}
@@ -424,6 +458,26 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
               renameResourceMutation.mutate({
                 resourceId: selectedId,
                 newName,
+              });
+            }
+          }}
+        />
+      )}
+
+      {isShareModalOpen && (
+        <ShareResourceModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          resourceToShare={
+            displayData.find((obj) => obj.id === selectedId) || null
+          }
+          isSharing={grantPermissionMutation.isPending}
+          onShare={(email, role) => {
+            if (selectedId) {
+              grantPermissionMutation.mutate({
+                resourceId: selectedId,
+                email,
+                role,
               });
             }
           }}

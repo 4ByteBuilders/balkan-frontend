@@ -4,6 +4,7 @@ import {
   FilePenLine,
   Loader2,
   Move,
+  Share2,
   Upload,
 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -29,6 +30,7 @@ interface ActionButtonsProps {
   handleDelete: () => void;
   onMoveClick: () => void;
   onRenameClick: () => void;
+  onShareClick: () => void;
 }
 
 export const ActionButtons = ({
@@ -39,6 +41,7 @@ export const ActionButtons = ({
   handleDelete,
   onMoveClick,
   onRenameClick,
+  onShareClick,
 }: ActionButtonsProps) => {
   const [openCreateFolderModal, setOpenCreateFolderModal] =
     useState<boolean>(false);
@@ -65,6 +68,10 @@ export const ActionButtons = ({
       <Button variant="outline" onClick={onRenameClick} disabled={!selectedId}>
         <FilePenLine />
         Rename
+      </Button>
+      <Button variant="outline" onClick={onShareClick} disabled={!selectedId}>
+        <Share2 />
+        Share
       </Button>
       <Button variant="outline" onClick={onMoveClick} disabled={!selectedId}>
         <Move />
