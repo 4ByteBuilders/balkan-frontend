@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 import type { Object, ObjectPath } from "@/lib/interfaces";
 import { useParams } from "react-router";
 import { ResourcesList } from "@/components/dashboard/ResourcesList";
+import { useAuth } from "@/context/AuthContext";
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return "0 Bytes";
@@ -194,6 +195,7 @@ const SharedFileView = ({ resource }: { resource: Object }) => {
 
 export const SharedResourcePage = () => {
   const { shareToken } = useParams<{ shareToken: string }>();
+  const { isLoading: isAuthLoading } = useAuth();
 
   const {
     data: resource,
@@ -208,11 +210,11 @@ export const SharedResourcePage = () => {
       }
       return resolveShareLinkAPI(shareToken);
     },
-    enabled: !!shareToken,
+    enabled: !!shareToken && !isAuthLoading,
     retry: false,
   });
 
-  if (isLoading) {
+  if (isLoading || isAuthLoading) {
     return <LoadingPage />;
   }
 
