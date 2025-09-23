@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { resolveShareLinkAPI } from "@/api/objects";
 import { LoadingPage } from "@/components/common/loading";
@@ -6,7 +6,7 @@ import { ErrorPage } from "@/components/common/error";
 import { File, Folder, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
-import type { Object, ObjectPath } from "@/lib/interfaces";
+import type { Object } from "@/lib/interfaces";
 import { useLocation, useParams } from "react-router";
 import { ResourcesList } from "@/components/dashboard/ResourcesList";
 import { useAuth } from "@/context/AuthContext";
@@ -44,8 +44,13 @@ const SharedFolderView = ({ folder }: { folder: Object }) => {
       ) : (
         <ResourcesList
           resourceArray={folder.children || []}
-          handleFolderClick={() => {
-            /* Sub-folder navigation is not supported in this view */
+          handleFolderClick={(clickedFolderInfo) => {
+            const clickedFolder = (folder.children || []).find(
+              (child) => child.id === clickedFolderInfo.id
+            );
+            if (clickedFolder) {
+              window.location.href = `${window.location.origin}/${clickedFolder.type}/${clickedFolder.shareToken}`;
+            }
           }}
           selectedId={null}
           onSelect={() => {}}
@@ -65,13 +70,10 @@ const SharedFileView = ({ resource }: { resource: Object }) => {
   const handleDownload = async () => {
     setIsDownloading(true);
     // Assuming the token is stored in localStorage with the key "token"
-    const token = localStorage.getItem("token");
+    let token = localStorage.getItem("token");
 
     if (!token) {
-      console.error("Authentication token not found in localStorage.");
-      // Optionally, show a toast message to the user.
-      setIsDownloading(false);
-      return;
+      token = "iamaguestuserwithpublicaccessbitch";
     }
 
     try {
@@ -162,11 +164,13 @@ export const SharedResourcePage = () => {
 
   const location = useLocation();
 
-  const expectedType = location.pathname.startsWith("/folder/") ? "folder"
-      : location.pathname.startsWith("/file/") ? "file"
-      : null;
+  const expectedType = location.pathname.startsWith("/folder/")
+    ? "folder"
+    : location.pathname.startsWith("/file/")
+    ? "file"
+    : null;
 
-    const {
+  const {
     data: resource,
     isLoading,
     error,
@@ -177,7 +181,7 @@ export const SharedResourcePage = () => {
       if (!shareToken) {
         throw new Error("No share token provided.");
       }
-      if(!expectedType){
+      if (!expectedType) {
         throw new Error("Invalid Resource Type");
       }
       // Pass expectedType to the API

@@ -7,6 +7,8 @@ import {
   uploadFileAPI,
   renameResourceAPI,
   searchResourcesAPI,
+  makeResourcePublicAPI,
+  removeResourcePublicAccessAPI,
   grantPermissionAPI,
   type SearchFilters,
 } from "@/api/objects";
@@ -267,6 +269,30 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
     },
   });
 
+  // Mutation: Toggle Public Access
+  const togglePublicMutation = useMutation({
+    mutationFn: ({
+      resourceId,
+      isPublic,
+    }: {
+      resourceId: string;
+      isPublic: boolean;
+    }) => {
+      return isPublic
+        ? makeResourcePublicAPI(resourceId)
+        : removeResourcePublicAccessAPI(resourceId);
+    },
+    onSuccess: (data) => {
+      toast.success(`Resource is now ${data.isPublic ? "public" : "private"}.`);
+      queryClient.invalidateQueries({
+        queryKey: ["resources", currentFolderId],
+      });
+    },
+    onError: (err: CustomError) => {
+      toast.error(err.message);
+    },
+  });
+
   const handleFolderClick = (clickedObject: ObjectPath) => {
     if (isSearching) {
       // When a folder is clicked from search results, exit search mode
@@ -479,6 +505,12 @@ export const Resources = ({ ids, setIds }: ResourcesProps) => {
                 email,
                 role,
               });
+            }
+          }}
+          isTogglingPublic={togglePublicMutation.isPending}
+          onTogglePublic={(isPublic) => {
+            if (selectedId) {
+              togglePublicMutation.mutate({ resourceId: selectedId, isPublic });
             }
           }}
         />

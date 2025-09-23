@@ -30,6 +30,7 @@ export interface Object {
   parentId?: string;
   permissions?: Permission[];
   children?: Object[];
+  isPublic: boolean;
 }
 
 export interface ObjectPath {

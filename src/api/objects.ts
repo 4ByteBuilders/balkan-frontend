@@ -13,6 +13,7 @@ const RESOURCES_QUERY_FRAGMENT = `
           createdAt
           updatedAt
           shareToken
+          isPublic
           ... on File {
             sizeBytes
             mimeType
@@ -106,6 +107,7 @@ export const createNewFolder = async ({
         }
         createdAt
         updatedAt
+        isPublic
         owner {
           id
           username
@@ -152,6 +154,7 @@ export const uploadFileAPI = async ({
         mimeType
         createdAt
         updatedAt
+        isPublic
         parent {
           id
           name
@@ -297,6 +300,7 @@ export const searchResourcesAPI = async ({
         searchResources(filters: $filters, offset: $offset, limit: $limit) {
           id
           name
+          isPublic
           ... on File {
             type
             sizeBytes
@@ -362,6 +366,7 @@ export const renameResourceAPI = async ({
           id
           name
           type
+          isPublic
         }
       }
     `
@@ -371,6 +376,7 @@ export const renameResourceAPI = async ({
           id
           name
           type
+          isPublic
         }
       }
     `;
@@ -421,6 +427,8 @@ export const resolveShareLinkAPI = async (token: string, expectedType: string) =
             children {
               id
               name
+              shareToken
+              isPublic
               owner {
                 id
                 username
@@ -503,6 +511,68 @@ export const grantPermissionAPI = async ({
       throw new CustomError(message, err.response?.status || 500);
     }
     throw new CustomError("Failed to grant permission", 500);
+  }
+};
+
+export const makeResourcePublicAPI = async (resourceId: string) => {
+  const query = `
+    mutation MakeResourcePublic($resourceId: ID!) {
+      makeResourcePublic(resourceId: $resourceId) {
+        id
+        isPublic
+        shareToken
+      }
+    }
+  `;
+  try {
+    const response = await gqlRequest(query, { resourceId });
+    if (!response.data || !response.data.makeResourcePublic) {
+      throw new CustomError("Failed to make resource public", 500);
+    }
+    return response.data.makeResourcePublic;
+  } catch (err) {
+    console.error(err);
+    if (err instanceof CustomError) {
+      throw err;
+    }
+    if (err instanceof AxiosError) {
+      const message =
+        err.response?.data?.errors?.[0]?.message ||
+        "Failed to make resource public";
+      throw new CustomError(message, err.response?.status || 500);
+    }
+    throw new CustomError("Failed to make resource public", 500);
+  }
+};
+
+export const removeResourcePublicAccessAPI = async (resourceId: string) => {
+  const query = `
+    mutation RemoveResourcePublicAccess($resourceId: ID!) {
+      removeResourcePublicAccess(resourceId: $resourceId) {
+        id
+        isPublic
+        shareToken
+      }
+    }
+  `;
+  try {
+    const response = await gqlRequest(query, { resourceId });
+    if (!response.data || !response.data.removeResourcePublicAccess) {
+      throw new CustomError("Failed to remove public access", 500);
+    }
+    return response.data.removeResourcePublicAccess;
+  } catch (err) {
+    console.error(err);
+    if (err instanceof CustomError) {
+      throw err;
+    }
+    if (err instanceof AxiosError) {
+      const message =
+        err.response?.data?.errors?.[0]?.message ||
+        "Failed to remove public access";
+      throw new CustomError(message, err.response?.status || 500);
+    }
+    throw new CustomError("Failed to remove public access", 500);
   }
 };
 

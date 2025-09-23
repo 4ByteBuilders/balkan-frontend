@@ -21,6 +21,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/file/:shareToken" element={<SharedResourcePage />} />
             <Route path="/folder/:shareToken" element={<SharedResourcePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<ErrorPage error={notFoundError} />} />
           </Routes>
         </BrowserRouter>

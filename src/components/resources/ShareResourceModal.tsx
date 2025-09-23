@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 interface ShareResourceModalProps {
   isOpen: boolean;
@@ -27,6 +28,8 @@ interface ShareResourceModalProps {
   resourceToShare: Object | null;
   onShare: (email: string, role: Role) => void;
   isSharing: boolean;
+  onTogglePublic: (isPublic: boolean) => void;
+  isTogglingPublic: boolean;
 }
 
 export const ShareResourceModal = ({
@@ -35,6 +38,8 @@ export const ShareResourceModal = ({
   resourceToShare,
   onShare,
   isSharing,
+  onTogglePublic,
+  isTogglingPublic,
 }: ShareResourceModalProps) => {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("VIEWER");
@@ -71,6 +76,22 @@ export const ShareResourceModal = ({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="public-toggle" className="text-base">
+                Public Access
+              </Label>
+              <DialogDescription>
+                Anyone with the link can view this resource.
+              </DialogDescription>
+            </div>
+            <Switch
+              id="public-toggle"
+              checked={resourceToShare.isPublic}
+              onCheckedChange={onTogglePublic}
+              disabled={isTogglingPublic}
+            />
+          </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="share-link">Copy Link</Label>
             <div className="flex gap-2">
@@ -93,7 +114,6 @@ export const ShareResourceModal = ({
               </Button>
             </div>
           </div>
-          Select
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Share with a user</Label>
             <div className="flex gap-2">
