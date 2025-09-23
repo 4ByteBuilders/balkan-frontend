@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { resolveShareLinkAPI, getObjectsByParentId } from "@/api/objects";
+import { resolveShareLinkAPI } from "@/api/objects";
 import { LoadingPage } from "@/components/common/loading";
 import { ErrorPage } from "@/components/common/error";
 import { File, Folder, Download, Loader2 } from "lucide-react";
@@ -24,66 +24,29 @@ const formatBytes = (bytes: number, decimals = 2) => {
 };
 
 const SharedFolderView = ({ folder }: { folder: Object }) => {
-  const [path, setPath] = useState<ObjectPath[]>([]);
+  // Since we are only showing the content of the top-level shared folder,
+  // we can directly use its properties.
+  const children = folder.children || [];
 
-  useEffect(() => {
-    if (folder) {
-      setPath([{ id: folder.id, name: folder.name }]);
-    }
-  }, [folder]);
-
-  const currentFolderId = path[path.length - 1]?.id;
-
-  const {
-    data: children = [],
-    isLoading,
-    error,
-  } = useQuery<Object[], Error>({
-    queryKey: ["shared-folder", currentFolderId],
-    queryFn: () => getObjectsByParentId(currentFolderId),
-    enabled: !!currentFolderId,
-  });
-
-  const handleFolderClick = (folder: ObjectPath) => {
-    setPath((prev) => [...prev, folder]);
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    setPath((prev) => prev.slice(0, index + 1));
-  };
+  // useEffect(()=>{
+  //   console.log("Mounted");
+  // }, []);
 
   return (
     <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-4 sm:p-8 space-y-6">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap border-b pb-4">
-        {path.map((p, i) => (
-          <React.Fragment key={p.id}>
-            {i > 0 && <span className="text-gray-400">/</span>}
-            <button
-              onClick={() => handleBreadcrumbClick(i)}
-              className={`hover:underline ${
-                i === path.length - 1 ? "font-semibold text-gray-800" : ""
-              }`}
-              disabled={i === path.length - 1}
-            >
-              {p.name}
-            </button>
-          </React.Fragment>
-        ))}
+        <span className="font-semibold text-gray-800">{folder.name}</span>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8">Loading...</div>
-      ) : error ? (
-        <div className="text-center text-red-500 py-8">
-          Error loading folder contents.
-        </div>
-      ) : children.length === 0 ? (
+      {children.length === 0 ? (
         <p className="text-center text-gray-500 py-8">This folder is empty.</p>
       ) : (
         <ResourcesList
-          resourceArray={children}
-          handleFolderClick={handleFolderClick}
+          resourceArray={folder.children || []}
+          handleFolderClick={() => {
+            /* Sub-folder navigation is not supported in this view */
+          }}
           selectedId={null}
           onSelect={() => {}}
         />

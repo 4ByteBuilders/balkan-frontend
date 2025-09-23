@@ -29,6 +29,7 @@ export interface Object {
   shareToken: string;
   parentId?: string;
   permissions?: Permission[];
+  children?: Object[];
 }
 
 export interface ObjectPath {

@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 import { Header } from "./components/common/header";
 import { LandingPage } from "./screens/landing_page";
+import ProfilePage from "./components/profile/profile";
 import { Footer } from "./components/common/footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";

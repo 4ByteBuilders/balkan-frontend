@@ -73,6 +73,7 @@ export const getRootLevelObjects = async () => {
 export const getObjectsByParentId = async (folderId: string) => {
   try {
     const response = await gqlRequest(RESOURCES_QUERY_FRAGMENT, { folderId });
+    console.log("RESPONSE", response.data);
     return response.data.resources;
   } catch (err) {
     console.log(err);
@@ -417,6 +418,24 @@ export const resolveShareLinkAPI = async (token: string, expectedType: string) =
           }
           ... on Folder {
             type
+            children {
+              id
+              name
+              owner {
+                id
+                username
+              }
+              createdAt
+              updatedAt
+              ... on File {
+                type
+                sizeBytes
+                mimeType
+              }
+              ... on Folder {
+                type
+              }
+            }
           }
         }
       }
@@ -484,5 +503,32 @@ export const grantPermissionAPI = async ({
       throw new CustomError(message, err.response?.status || 500);
     }
     throw new CustomError("Failed to grant permission", 500);
+  }
+};
+
+export const getMe = async () => {
+  try {
+    const query = `
+      query GetMe {
+        me {
+          id
+          username
+          email
+          Role
+          StorageUsed
+          DeduplicationStorageUsed
+        }
+      }
+    `;
+    const response = await gqlRequest(query);
+    return response.data;
+  } catch (err) {
+    if (err instanceof AxiosError) {
+      throw new CustomError(
+        err.response?.data.errors[0].message || "Failed to fetch user profile",
+        err.response?.status || 500
+      );
+    }
+    throw new CustomError("Failed to fetch user profile", 500);
   }
 };
