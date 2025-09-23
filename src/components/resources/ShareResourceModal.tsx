@@ -41,7 +41,7 @@ export const ShareResourceModal = ({
 
   if (!resourceToShare) return null;
 
-  const shareLink = `${window.location.origin}/file/${resourceToShare.shareToken}`;
+  const shareLink = `${window.location.origin}/${resourceToShare.type}/${resourceToShare.shareToken}`;
 
   const handleCopyLink = () => {
     if (!resourceToShare.shareToken) {

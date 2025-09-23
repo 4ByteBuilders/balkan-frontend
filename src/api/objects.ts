@@ -395,11 +395,11 @@ export const renameResourceAPI = async ({
   }
 };
 
-export const resolveShareLinkAPI = async (token: string) => {
+export const resolveShareLinkAPI = async (token: string, expectedType: string) => {
   try {
     const query = `
-      query ResolveShareLink($token: String!) {
-        resolveShareLink(token: $token) {
+      query ResolveShareLink($token: String!, $expectedType: String!) {
+        resolveShareLink(token: $token, expectedType: $expectedType) {
           id
           name
           createdAt
@@ -421,7 +421,7 @@ export const resolveShareLinkAPI = async (token: string) => {
         }
       }
     `;
-    const response = await gqlRequest(query, { token });
+    const response = await gqlRequest(query, { token, expectedType });
     if (!response.data || !response.data.resolveShareLink) {
       throw new CustomError("Resource not found or access denied", 404);
     }

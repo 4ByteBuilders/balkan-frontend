@@ -5,8 +5,12 @@ import { Footer } from "./components/common/footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import { SharedResourcePage } from "./lib/SharedResourcePage";
+import { ErrorPage } from "./components/common/error";
 
 function App() {
+
+  const notFoundError = Error("Resource Not Found!");
+
   return (
     <AuthProvider>
       <Header>
@@ -15,7 +19,8 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/file/:shareToken" element={<SharedResourcePage />} />
-            <Route path="*" element={<div>Not Found</div>} />
+            <Route path="/folder/:shareToken" element={<SharedResourcePage />} />
+            <Route path="*" element={<ErrorPage error={notFoundError} />} />
           </Routes>
         </BrowserRouter>
         <Footer />

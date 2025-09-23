@@ -7,7 +7,7 @@ import { File, Folder, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import type { Object, ObjectPath } from "@/lib/interfaces";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import { ResourcesList } from "@/components/dashboard/ResourcesList";
 import { useAuth } from "@/context/AuthContext";
 
@@ -197,18 +197,28 @@ export const SharedResourcePage = () => {
   const { shareToken } = useParams<{ shareToken: string }>();
   const { isLoading: isAuthLoading } = useAuth();
 
-  const {
+  const location = useLocation();
+
+  const expectedType = location.pathname.startsWith("/folder/") ? "folder"
+      : location.pathname.startsWith("/file/") ? "file"
+      : null;
+
+    const {
     data: resource,
     isLoading,
     error,
     refetch,
   } = useQuery<Object, Error>({
-    queryKey: ["shared-resource", shareToken],
+    queryKey: ["shared-resource", shareToken, expectedType],
     queryFn: () => {
       if (!shareToken) {
         throw new Error("No share token provided.");
       }
-      return resolveShareLinkAPI(shareToken);
+      if(!expectedType){
+        throw new Error("Invalid Resource Type");
+      }
+      // Pass expectedType to the API
+      return resolveShareLinkAPI(shareToken, expectedType);
     },
     enabled: !!shareToken && !isAuthLoading,
     retry: false,
